@@ -1,6 +1,6 @@
 import p5 from 'p5'
 
-export const drawEffect = (p: p5, effectBuffer: p5.Graphics, background: p5.Graphics, mask: p5.Graphics) => {
+export const drawEffect = (p: p5, _background: p5.Graphics, _mask: p5.Graphics) => {
     const count = 30
     const rad = 300
 

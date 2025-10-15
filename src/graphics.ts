@@ -1,6 +1,6 @@
 ﻿import p5 from 'p5';
-import {Camera} from "@mediapipe/camera_utils";
-import {Segmentator} from "./inference.ts";
+import { Camera } from "@mediapipe/camera_utils";
+import { Segmentator } from "./inference.ts";
 import { drawEffect } from './effect.ts';
 import { FrameRate } from './framerate.ts';
 
@@ -13,7 +13,7 @@ const cam = new Camera(videoElem, {
     },
     width: 1280,
     height: 720
-});
+})
 
 const sketch = (p: p5) => {
     let latestMask: HTMLImageElement | null = null;
@@ -28,11 +28,7 @@ const sketch = (p: p5) => {
     const initGraphics =
         (img: HTMLImageElement): p5.Graphics => p.createGraphics(img.width, img.height)
 
-    let effectBuffer: p5.Graphics
-
     const fps = new FrameRate(16)
-
-    const res = 30
 
     p.setup = () => {
         cam.start().then(_ => {
@@ -50,7 +46,6 @@ const sketch = (p: p5) => {
 
         p.noStroke()
         p.fill(255)
-        effectBuffer = p.createGraphics(p.width, p.height)
 
         fps.reset()
     }
@@ -72,7 +67,7 @@ const sketch = (p: p5) => {
 
             p.image(cameraGraphics, 0, 0)
 
-            drawEffect(p, effectBuffer, cameraGraphics, resultGraphics)
+            drawEffect(p, cameraGraphics, resultGraphics)
 
             const foreground = cameraGraphics.get()
             foreground.mask(resultGraphics.get())
