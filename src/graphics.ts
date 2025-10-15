@@ -1,18 +1,19 @@
 ﻿import p5 from 'p5';
 import {Camera} from "@mediapipe/camera_utils";
 import {Segmentator} from "./inference.ts";
+import { drawEffect } from './effect.ts';
+import { FrameRate } from './framerate.ts';
 
 const segmentator = new Segmentator()
 
 const videoElem = document.createElement('video') as HTMLVideoElement
-const camera = new Camera(videoElem, {
+const cam = new Camera(videoElem, {
     onFrame: async () => {
         await segmentator.send(videoElem)
     },
     width: 1280,
     height: 720
 });
-camera.start()
 
 const sketch = (p: p5) => {
     let latestMask: HTMLImageElement | null = null;
@@ -20,42 +21,65 @@ const sketch = (p: p5) => {
         latestMask = img;
     });
 
+    let cameraGraphics: p5.Graphics
+    let cameraInitiated = false
+
     let resultGraphics: p5.Graphics
     const initGraphics =
         (img: HTMLImageElement): p5.Graphics => p.createGraphics(img.width, img.height)
 
+    let effectBuffer: p5.Graphics
+
+    const fps = new FrameRate(16)
+
     const res = 30
 
     p.setup = () => {
+        cam.start().then(_ => {
+            videoElem.addEventListener('loadedmetadata', () => {
+                cameraGraphics = p.createGraphics(videoElem.videoWidth, videoElem.videoHeight)
+                cameraInitiated = true
+            })
+        })
+
         const cnv = p.createCanvas(1280, 720)
         const app = document.getElementById('app')
-        console.log(app)
+
         if (!app) throw new Error('No app element found')
         cnv.parent(app)
+
+        p.noStroke()
+        p.fill(255)
+        effectBuffer = p.createGraphics(p.width, p.height)
+
+        fps.reset()
     }
 
     p.draw = () => {
-        p.clear();
+        fps.onFrame()
 
-        const ux = p.width / res;
-        const uy = p.height / res;
-        for (let i = 0; i <= res; i++) {
-            for (let j = 0; j <= res; j++) {
-                p.fill((i + j) % 2 == 0 ? 255 : 100);
-                p.rect(i * ux, j * uy, ux, uy);
-            }
-        }
+        p.clear()
 
-        if (latestMask) {
+        if (cameraInitiated && latestMask) {
             if (!resultGraphics){
-                resultGraphics = initGraphics(latestMask);
+                resultGraphics = initGraphics(latestMask)
             }
 
-            resultGraphics.drawingContext.clearRect(0, 0, resultGraphics.width, resultGraphics.height);
-            resultGraphics.drawingContext.drawImage(latestMask, 0, 0);
+            cameraGraphics.drawingContext.drawImage(videoElem, 0, 0, cameraGraphics.width, cameraGraphics.height)
 
-            p.image(resultGraphics, 0, 0, p.width, p.height);
+            resultGraphics.drawingContext.clearRect(0, 0, resultGraphics.width, resultGraphics.height)
+            resultGraphics.drawingContext.drawImage(latestMask, 0, 0)
+
+            p.image(cameraGraphics, 0, 0)
+
+            drawEffect(p, effectBuffer, cameraGraphics, resultGraphics)
+
+            const foreground = cameraGraphics.get()
+            foreground.mask(resultGraphics.get())
+            p.image(foreground, 0, 0)
         }
+
+        p.text("fps: " + fps.getFps(1), 10, 20)
     }
 
     p.keyPressed = () => {
