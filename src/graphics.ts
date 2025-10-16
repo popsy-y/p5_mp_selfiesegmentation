@@ -11,8 +11,8 @@ const cam = new Camera(videoElem, {
     onFrame: async () => {
         await segmentator.send(videoElem)
     },
-    width: 1280,
-    height: 720
+    width: 1920,
+    height: 1080
 })
 
 const sketch = (p: p5) => {
@@ -38,14 +38,11 @@ const sketch = (p: p5) => {
             })
         })
 
-        const cnv = p.createCanvas(1280, 720)
+        const cnv = p.createCanvas(1920, 1080)
         const app = document.getElementById('app')
 
         if (!app) throw new Error('No app element found')
         cnv.parent(app)
-
-        p.noStroke()
-        p.fill(255)
 
         fps.reset()
     }
@@ -65,13 +62,16 @@ const sketch = (p: p5) => {
             resultGraphics.drawingContext.clearRect(0, 0, resultGraphics.width, resultGraphics.height)
             resultGraphics.drawingContext.drawImage(latestMask, 0, 0)
 
-            p.image(cameraGraphics, 0, 0)
+            p.image(cameraGraphics, 0, 0, p.width, p.height)
+
+            p.fill(0, 0, 0, 150)
+            p.rect(0, 0, p.width, p.height)
 
             drawEffect(p, cameraGraphics, resultGraphics)
 
             const foreground = cameraGraphics.get()
             foreground.mask(resultGraphics.get())
-            p.image(foreground, 0, 0)
+            p.image(foreground, 0, 0, p.width, p.height)
         }
 
         p.text("fps: " + fps.getFps(1), 10, 20)
