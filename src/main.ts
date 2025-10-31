@@ -3,6 +3,7 @@ import { Camera } from "@mediapipe/camera_utils";
 import { Segmentator } from "./inference.ts";
 import { drawEffect } from './effect.ts';
 import { FrameRate } from './framerate.ts';
+import { calculateCentroid, DampedVector } from './helpers.ts';
 
 const segmentator = new Segmentator()
 
@@ -29,6 +30,7 @@ const sketch = (p: p5) => {
         (img: HTMLImageElement): p5.Graphics => p.createGraphics(img.width, img.height)
 
     const fps = new FrameRate(16)
+    let centroidDamper: DampedVector
 
     p.setup = () => {
         cam.start().then(_ => {
@@ -44,7 +46,9 @@ const sketch = (p: p5) => {
         if (!app) throw new Error('No app element found')
         cnv.parent(app)
 
-        fps.reset()
+    fps.reset()
+    // initialize centroid damper: start centered, tau=0.25s, 2D
+    centroidDamper = new DampedVector(p.createVector(0.5, 0.5, 0), 0.25, 2)
     }
 
     p.draw = () => {
@@ -67,11 +71,35 @@ const sketch = (p: p5) => {
             p.fill(0, 0, 0, 150)
             p.rect(0, 0, p.width, p.height)
 
+            const sampleGridX = 16
+            const sampleGridY = 9
+            // use helper to sample resultGraphics and compute centroid
+            const { centroid, opaqueRatio, samples } = calculateCentroid(resultGraphics, sampleGridX, sampleGridY)
+            // visualize samples (if returned)
+            if (samples) {
+                for (const s of samples) {
+                    if (s.weight) {
+                        p.fill(200, 50, 50)
+                    } else {
+                        p.fill(50, 150, 200)
+                    }
+                    p.ellipse(p.width * s.nx, p.height * s.ny, 20)
+                }
+            }
+
+            // visualize damped centroid (centroid is normalized 0..1)
+            const damped = centroidDamper.update(centroid, p.deltaTime / 1000)
+            p.fill(255, 255, 0)
+            p.ellipse(p.width * damped.x, p.height * damped.y, 32)
+
+            p.fill(0)
+            p.text("opaque: " + opaqueRatio, 10, 40)
+
             drawEffect(p, cameraGraphics, resultGraphics)
 
             const foreground = cameraGraphics.get()
             foreground.mask(resultGraphics.get())
-            p.image(foreground, 0, 0, p.width, p.height)
+            // p.image(foreground, 0, 0, p.width, p.height)
         }
 
         p.text("fps: " + fps.getFps(1), 10, 20)
