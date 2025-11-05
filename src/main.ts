@@ -99,7 +99,7 @@ const sketch = (p: p5) => {
 
             const foreground = cameraGraphics.get()
             foreground.mask(resultGraphics.get())
-            // p.image(foreground, 0, 0, p.width, p.height)
+            p.image(foreground, 0, 0, p.width, p.height)
         }
 
         p.text("fps: " + fps.getFps(1), 10, 20)
