@@ -3,7 +3,8 @@ import { Camera } from "@mediapipe/camera_utils";
 import { Segmentator } from "./inference.ts";
 import { drawEffect } from './effect.ts';
 import { FrameRate } from './framerate.ts';
-import { calculateCentroid, DampedVector } from './helpers.ts';
+import { calculateCentroid, DampedVector, n2p1 } from './helpers.ts';
+import { drawRotatingSquare } from './shapes/rotatingSquare.ts';
 
 const segmentator = new Segmentator()
 
@@ -46,9 +47,11 @@ const sketch = (p: p5) => {
         if (!app) throw new Error('No app element found')
         cnv.parent(app)
 
-    fps.reset()
-    // initialize centroid damper: start centered, tau=0.25s, 2D
-    centroidDamper = new DampedVector(p.createVector(0.5, 0.5, 0), 0.25, 2)
+        p.noStroke()
+
+        fps.reset()
+        // initialize centroid damper: start centered, tau=0.25s, 2D
+        centroidDamper = new DampedVector(p.createVector(0.5, 0.5, 0), 0.25, 2)
     }
 
     p.draw = () => {
@@ -66,16 +69,42 @@ const sketch = (p: p5) => {
             resultGraphics.drawingContext.clearRect(0, 0, resultGraphics.width, resultGraphics.height)
             resultGraphics.drawingContext.drawImage(latestMask, 0, 0)
 
+
+            //  DRAW BACKGROUND
+            // --------------------------
             p.image(cameraGraphics, 0, 0, p.width, p.height)
 
-            p.fill(0, 0, 0, 150)
+            // dumb way to dim bg~ so many dumb ways to dim bg~
+            p.fill(0, 0, 0, 190)
             p.rect(0, 0, p.width, p.height)
 
+
+            //  SAMPLE FILLED AREA
+            // -----------------------------
             const sampleGridX = 16
             const sampleGridY = 9
-            // use helper to sample resultGraphics and compute centroid
             const { centroid, opaqueRatio, samples } = calculateCentroid(resultGraphics, sampleGridX, sampleGridY)
-            // visualize samples (if returned)
+
+            // damped centroid (centroid is normalized 0..1)
+            const damped = centroidDamper.update(centroid, p.deltaTime / 1000)
+
+            
+            //  DRAW INTERMEDIATE LAYER
+            // ----------------------------------
+            // draw some shapes that chases detected subject
+            // expected io: drawShapeFunc(p: p5, centroid: p5.Vector, samples: SamplePoint[], targetAvailable: boolean)
+            const targetAvailable = opaqueRatio > .01 // 対象が検出されているかの判定
+            drawRotatingSquare(p, damped, samples, targetAvailable)
+
+
+            //  DRAW FOREGROUND
+            // --------------------------
+            const foreground = cameraGraphics.get()
+            foreground.mask(resultGraphics.get())
+            p.image(foreground, 0, 0, p.width, p.height)
+
+
+            // < DEBUG >
             if (samples) {
                 for (const s of samples) {
                     if (s.weight) {
@@ -83,23 +112,17 @@ const sketch = (p: p5) => {
                     } else {
                         p.fill(50, 150, 200)
                     }
-                    p.ellipse(p.width * s.nx, p.height * s.ny, 20)
+                    p.ellipse(p.width * s.nx, p.height * s.ny, 3)
                 }
             }
 
-            // visualize damped centroid (centroid is normalized 0..1)
-            const damped = centroidDamper.update(centroid, p.deltaTime / 1000)
+            // visualize damped centroid
             p.fill(255, 255, 0)
-            p.ellipse(p.width * damped.x, p.height * damped.y, 32)
+            p.ellipse(p.width * damped.x, p.height * damped.y, 5)
 
-            p.fill(0)
-            p.text("opaque: " + opaqueRatio, 10, 40)
-
-            drawEffect(p, cameraGraphics, resultGraphics)
-
-            const foreground = cameraGraphics.get()
-            foreground.mask(resultGraphics.get())
-            p.image(foreground, 0, 0, p.width, p.height)
+            const textEpsilon = 5
+            p.text("opaque: " + opaqueRatio, n2p1(damped.x, p.width) + textEpsilon, n2p1(damped.y, p.height) + textEpsilon)
+            // </ DEBUG >
         }
 
         p.text("fps: " + fps.getFps(1), 10, 20)

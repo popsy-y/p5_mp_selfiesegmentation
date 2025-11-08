@@ -6,6 +6,39 @@ export const vec3 = (x = 0, y = 0, z = 0) => new p5.Vector(x, y, z)
 export const v2one = () => vec2(1, 1)
 export const v3one = () => vec3(1, 1, 1)
 
+// Converts normalized coordinate to pixel coodinate in given resolution
+// Convert a single normalized coordinate to pixel coordinate (one dimension).
+export function n2p1(
+	n = 0.5,
+	length = 1,
+	{ clamp = true, round = true }: { clamp?: boolean; round?: boolean } = {}
+): number {
+	let v = n * length
+
+	if (clamp) {
+		v = Math.max(0, Math.min(length - 1, v))
+	}
+
+	if (round) {
+		v = Math.floor(v)
+	}
+
+	return v
+}
+
+// Convert 2D normalized coords to pixel coords using n2p1 for each dimension.
+export function n2p(
+	nx = 0.5,
+	ny = 0.5,
+	width = 1,
+	height = 1,
+	opts: { clamp?: boolean; round?: boolean } = {}
+): p5.Vector {
+	const x = n2p1(nx, width, opts)
+	const y = n2p1(ny, height, opts)
+	return vec2(x, y)
+}
+
 export type SamplePoint = {
 	nx: number // normalized x (0..1)
 	ny: number // normalized y (0..1)
