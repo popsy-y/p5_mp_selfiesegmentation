@@ -45,56 +45,129 @@ export type SamplePoint = {
 	weight: number // 0 or 1 in current implementation
 }
 
+let rt: p5.Graphics
+
+const show = (s: number) => console.log(performance.now() - s)
+
 export function calculateCentroid(
+	p: p5,
 	resultGraphics: p5.Graphics,
 	sampleGridX = 16,
 	sampleGridY = 9
 ): { centroid: p5.Vector; opaqueRatio: number; samples: SamplePoint[] } {
-	// Ensure pixels are up-to-date
-	resultGraphics.loadPixels()
-	const pxs = resultGraphics.pixels
 
-	const ux = resultGraphics.width / sampleGridX
-	const uy = resultGraphics.height / sampleGridY
+	if (!rt) rt = p.createGraphics(sampleGridX, sampleGridY)
 
-	let sumW = 0
-	let sumWX = 0
-	let sumWY = 0
-	let opaqueCount = 0
+	if (rt.width != sampleGridX || rt.height != sampleGridY) rt = p.createGraphics(sampleGridX, sampleGridY)
 
-	const samples: SamplePoint[] = []
+	rt.clear()
+	rt.image(resultGraphics, 0, 0, 16, 9)
+	// p.image(rt, 0, 0, 1920, 1080)
 
-	for (let x = 0; x < sampleGridX; x++) {
-		for (let y = 0; y < sampleGridY; y++) {
-			const sx = Math.floor(ux * x + ux / 2)
-			const sy = Math.floor(uy * y + uy / 2)
+	// --- Step 2: ピクセルデータを CPU に引き戻す ---
+	rt.loadPixels();  // 16×9 → 144px の RGBA
 
-			const baseIdx = (sx + sy * resultGraphics.width) * 4
-			const alpha = pxs[baseIdx + 3] // 0-255
+	const pxs = rt.pixels;
+	const w = sampleGridX;
+	const h = sampleGridY;
 
-			const weight = alpha > 128 ? 1 : 0
+	// --- Step 3: 従来のサンプリング計算を「144 px に対してだけ」行う ---
+	let sumW = 0;
+	let sumWX = 0;
+	let sumWY = 0;
+	let opaqueCount = 0;
 
-			const nx = sx / resultGraphics.width
-			const ny = sy / resultGraphics.height
+	const samples: SamplePoint[] = [];
 
-			sumW += weight
-			sumWX += weight * nx
-			sumWY += weight * ny
+	for (let gx = 0; gx < w; gx++) {
+		for (let gy = 0; gy < h; gy++) {
 
-			if (weight) opaqueCount++
+			// 16×9 の rt の中の座標そのもの
+			const idx = (gx + gy * w) * 4;
+			const alpha = pxs[idx + 3] || 0;
 
-			samples.push({ nx, ny, weight })
+			const weight = alpha > 128 ? 1 : 0;
+
+			// 正規化座標（元の 1.0×1.0 空間）
+			const nx = gx / w;
+			const ny = gy / h;
+
+			sumW += weight;
+			sumWX += weight * nx;
+			sumWY += weight * ny;
+
+			if (weight) opaqueCount++;
+
+			samples.push({ nx, ny, weight });
 		}
 	}
 
-	const centroidX = sumW > 0 ? sumWX / sumW : 0.5
-	const centroidY = sumW > 0 ? sumWY / sumW : 0.5
+	// --- Step 4: 重心計算 ---
+	const centroidX = sumW > 0 ? sumWX / sumW : 0.5;
+	const centroidY = sumW > 0 ? sumWY / sumW : 0.5;
 
-	const centroid = new p5.Vector(centroidX, centroidY)
-	const opaqueRatio = opaqueCount / (sampleGridX * sampleGridY)
+	const centroid = new p5.Vector(centroidX, centroidY);
+	const opaqueRatio = opaqueCount / (sampleGridX * sampleGridY);
 
-	return { centroid, opaqueRatio, samples }
+	return { centroid, opaqueRatio, samples };
 }
+
+
+// export function calculateCentroid(
+// 	resultGraphics: p5.Graphics,
+// 	sampleGridX = 16,
+// 	sampleGridY = 9
+// ): { centroid: p5.Vector; opaqueRatio: number; samples: SamplePoint[] } {
+// 	// Ensure pixels are up-to-date and read from the backing array for performance
+	
+// 	resultGraphics.loadPixels()
+	
+// 	const rt = new p5.__Graphics__(16, 9, "webgl")
+// 	const pxs = resultGraphics.pixels as Uint8ClampedArray | number[]
+// 	const w = resultGraphics.width
+// 	const h = resultGraphics.height
+
+// 	const ux = w / sampleGridX
+// 	const uy = h / sampleGridY
+
+// 	let sumW = 0
+// 	let sumWX = 0
+// 	let sumWY = 0
+// 	let opaqueCount = 0
+
+// 	const samples: SamplePoint[] = []
+
+// 	for (let x = 0; x < sampleGridX; x++) {
+// 		for (let y = 0; y < sampleGridY; y++) {
+// 			const sx = Math.floor(ux * x + ux / 2)
+// 			const sy = Math.floor(uy * y + uy / 2)
+
+// 			const baseIdx = (sx + sy * w) * 4
+// 			const alpha = (pxs[baseIdx + 3] as number) || 0 // 0-255
+
+// 			const weight = alpha > 128 ? 1 : 0
+
+// 			const nx = sx / w
+// 			const ny = sy / h
+
+// 			sumW += weight
+// 			sumWX += weight * nx
+// 			sumWY += weight * ny
+
+// 			if (weight) opaqueCount++
+
+// 			samples.push({ nx, ny, weight })
+// 		}
+// 	}
+
+// 	const centroidX = sumW > 0 ? sumWX / sumW : 0.5
+// 	const centroidY = sumW > 0 ? sumWY / sumW : 0.5
+
+// 	const centroid = new p5.Vector(centroidX, centroidY)
+// 	const opaqueRatio = opaqueCount / (sampleGridX * sampleGridY)
+
+// 	return { centroid, opaqueRatio, samples }
+// }
 
 // Exponential damper for scalar values with time-constant control
 export class DampedNumber {

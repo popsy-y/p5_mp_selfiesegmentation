@@ -1,5 +1,7 @@
-type FixedLengthArray<T, N extends number, A extends T[] = []> = 
+export type FixedLengthArray<T, N extends number, A extends T[] = []> = 
     A['length'] extends N ? A : FixedLengthArray<T, N, [...A, T]>;
+
+export const PLT_LEN = 5
 
 export const palettes: FixedLengthArray<string, 5>[] = [
     ["#220c10","#506c64","#77cbb9","#75b8c8","#cdd3d5"],
