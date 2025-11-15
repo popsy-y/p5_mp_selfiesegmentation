@@ -50,14 +50,14 @@ const sketch = (p: p5) => {
     let zoom: Zoom
     let doZoom = false
 
-    let doDim = true
+    let doDim = false
 
     let perfRequested: boolean
     const perf = new PerformanceTimer()
 
     const mspfPerf = new PerformanceTimer()
 
-    let showDebugUi = true
+    let showDebugUi = false
 
     let dimDamper: DampedNumber
 
